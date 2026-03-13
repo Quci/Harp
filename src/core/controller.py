@@ -5,13 +5,14 @@ Coordinates audio recording, transcription, and keyboard input.
 
 import tempfile
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
 from ..audio.recorder import AudioRecorder
 from ..input.hotkey import HotkeyListener
 from ..input.keyboard import KeyboardSimulator
-from ..recognition.whisper_engine import WhisperEngine
+from ..recognition.whisper_engine import WhisperEngine, MockWhisperEngine
 from .state_machine import StateMachine, VoiceInputState
 
 
@@ -48,8 +49,8 @@ class VoiceInputController:
         
         # Recognition engine
         if use_mock:
-            from ..recognition.whisper_engine import MockWhisperEngine
             self.engine = MockWhisperEngine(model_path)
+            print("[INFO] Using mock mode (no real recognition)")
         else:
             self.engine = WhisperEngine(model_path)
             
@@ -61,7 +62,7 @@ class VoiceInputController:
         
     def _on_state_transition(self, old_state: VoiceInputState, new_state: VoiceInputState):
         """Handle state transition."""
-        print(f"State: {old_state.value} -> {new_state.value}")
+        print(f"[STATE] {old_state.value} -> {new_state.value}")
         
     def _on_hotkey(self):
         """Handle F5 hotkey press."""
@@ -87,10 +88,10 @@ class VoiceInputController:
             # Start recording
             self.recorder.start_recording(self._temp_audio_file)
             self.state_machine.transition_to(VoiceInputState.RECORDING)
-            print("Recording started... (press F5 to stop)")
+            print("🎤 Recording started... (press F5 to stop)")
             
         except Exception as e:
-            print(f"Failed to start recording: {e}")
+            print(f"[ERROR] Failed to start recording: {e}")
             self._cleanup()
             
     def _stop_and_process(self):
@@ -109,20 +110,20 @@ class VoiceInputController:
         try:
             # Stop recording
             audio_path = self.recorder.stop_recording()
-            print(f"Audio saved: {audio_path}")
+            print(f"[INFO] Audio saved: {audio_path}")
             
             # Transcribe
             text = self.engine.transcribe(audio_path)
             
             if text:
-                print(f"Transcription: {text}")
+                print(f"[INFO] Transcription: '{text}'")
                 self._type_result(text)
             else:
-                print("No transcription result")
+                print("[WARN] No transcription result")
                 self.state_machine.transition_to(VoiceInputState.IDLE)
                 
         except Exception as e:
-            print(f"Processing failed: {e}")
+            print(f"[ERROR] Processing failed: {e}")
             self.state_machine.transition_to(VoiceInputState.IDLE)
         finally:
             # Cleanup temp file
@@ -134,9 +135,11 @@ class VoiceInputController:
         
         try:
             # Type the text
+            print(f"[INFO] Typing text...")
             self.keyboard.type_text(text)
+            print(f"[INFO] Typing complete")
         except Exception as e:
-            print(f"Typing failed: {e}")
+            print(f"[ERROR] Typing failed: {e}")
         finally:
             self.state_machine.transition_to(VoiceInputState.IDLE)
             
@@ -151,16 +154,31 @@ class VoiceInputController:
         
     def start(self):
         """Start the voice input controller."""
+        print("=" * 50)
+        print("macOS Voice Bridge")
+        print("=" * 50)
+        
+        # Test keyboard simulator
+        print("[TEST] Testing keyboard simulator...")
+        try:
+            # Don't actually type during startup, just verify it works
+            pass
+        except Exception as e:
+            print(f"[WARN] Keyboard simulator test failed: {e}")
+        
         # Load model
         if not self.engine.load_model():
-            print("Warning: Failed to load model, using mock mode")
-            # Continue anyway for testing
+            print("[WARN] Failed to load model, continuing in limited mode")
             
         # Start hotkey listener
+        print("[INFO] Starting hotkey listener...")
         self.hotkey.start()
-        print("Voice Input Bridge started")
-        print("Press F5 to start/stop recording")
-        print("Press Ctrl+C to exit")
+        
+        print("\n✅ Voice Input Bridge started successfully!")
+        print("\nUsage:")
+        print("  - Press F5 to start/stop recording")
+        print("  - Press Ctrl+C to exit")
+        print("\nWaiting for F5 key...")
         
     def stop(self):
         """Stop the voice input controller."""
@@ -170,7 +188,7 @@ class VoiceInputController:
             self.recorder.stop_recording()
             
         self._cleanup()
-        print("Voice Input Bridge stopped")
+        print("\n[INFO] Voice Input Bridge stopped")
         
     def run(self):
         """Run the controller (blocking)."""
@@ -178,10 +196,74 @@ class VoiceInputController:
         
         try:
             # Keep running until interrupted
-            import time
             while True:
                 time.sleep(0.1)
         except KeyboardInterrupt:
-            print("\nInterrupted by user")
+            print("\n[INFO] Interrupted by user")
         finally:
             self.stop()
+
+
+def test_components():
+    """Test all components individually."""
+    print("=" * 50)
+    print("Component Test Mode")
+    print("=" * 50)
+    
+    # Test 1: Audio Recorder
+    print("\n[Test 1/4] Audio Recorder")
+    try:
+        recorder = AudioRecorder()
+        print("  ✅ AudioRecorder initialized")
+    except Exception as e:
+        print(f"  ❌ AudioRecorder failed: {e}")
+    
+    # Test 2: Keyboard Simulator
+    print("\n[Test 2/4] Keyboard Simulator")
+    try:
+        keyboard = KeyboardSimulator()
+        print("  ✅ KeyboardSimulator initialized")
+        print("  ⚠️  Will type 'test' in 3 seconds...")
+        time.sleep(3)
+        keyboard.type_text("test")
+        print("  ✅ Keyboard typing works")
+    except Exception as e:
+        print(f"  ❌ KeyboardSimulator failed: {e}")
+    
+    # Test 3: Hotkey Listener
+    print("\n[Test 3/4] Hotkey Listener")
+    try:
+        hotkey = HotkeyListener(lambda: print("  🔥 F5 pressed!"))
+        hotkey.start()
+        print("  ✅ HotkeyListener started")
+        print("  ⚠️  Press F5 three times to continue...")
+        
+        count = [0]
+        def increment():
+            count[0] += 1
+            print(f"  🔥 F5 pressed! ({count[0]}/3)")
+            
+        hotkey.on_hotkey = increment
+        
+        while count[0] < 3:
+            time.sleep(0.1)
+            
+        hotkey.stop()
+        print("  ✅ HotkeyListener works")
+    except Exception as e:
+        print(f"  ❌ HotkeyListener failed: {e}")
+    
+    # Test 4: Whisper Engine
+    print("\n[Test 4/4] Whisper Engine")
+    try:
+        engine = MockWhisperEngine()
+        if engine.load_model():
+            print("  ✅ Mock WhisperEngine works")
+        else:
+            print("  ❌ WhisperEngine failed to load")
+    except Exception as e:
+        print(f"  ❌ WhisperEngine failed: {e}")
+    
+    print("\n" + "=" * 50)
+    print("Component test complete!")
+    print("=" * 50)

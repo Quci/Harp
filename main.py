@@ -3,7 +3,7 @@
 macOS Voice Bridge - Voice input using Whisper.
 
 Usage:
-    python main.py [--model PATH] [--mock]
+    python main.py [--model PATH] [--mock] [--test]
 
 Press F5 to start/stop recording.
 The recognized text will be typed at the current cursor position.
@@ -16,7 +16,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from src.core.controller import VoiceInputController
+from src.core.controller import VoiceInputController, test_components
 
 
 def main():
@@ -33,8 +33,17 @@ def main():
         action="store_true",
         help="Use mock mode (no actual recognition, for testing)",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run component tests",
+    )
     
     args = parser.parse_args()
+    
+    if args.test:
+        test_components()
+        return
     
     # Create controller
     controller = VoiceInputController(
