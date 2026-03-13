@@ -1,13 +1,18 @@
 """
-Whisper speech recognition engine using whisper-cpp-python.
+Whisper speech recognition engine.
 """
 
-import os
 import time
 from pathlib import Path
 from typing import Optional
 
-from whisper_cpp_python import Whisper
+# Try to import whisper-cpp-python, fallback to mock if not available
+try:
+    from whisper_cpp_python import Whisper
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+    Whisper = None
 
 
 class WhisperEngine:
@@ -27,7 +32,7 @@ class WhisperEngine:
                        If None, looks in models/ directory.
         """
         self.model_path = model_path or self._find_default_model()
-        self._whisper: Optional[Whisper] = None
+        self._whisper = None
         
     def _find_default_model(self) -> Path:
         """Find the default model file."""
@@ -50,6 +55,11 @@ class WhisperEngine:
         Returns:
             True if loaded successfully, False otherwise.
         """
+        if not WHISPER_AVAILABLE:
+            print("Warning: whisper-cpp-python not installed. Using mock mode.")
+            print("Install with: pip install whisper-cpp-python")
+            return False
+            
         if self._whisper is not None:
             return True
             

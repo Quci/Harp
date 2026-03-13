@@ -8,9 +8,9 @@ import threading
 from pathlib import Path
 from typing import Optional
 
-from ..audio.recorder import SimpleAudioRecorder
+from ..audio.recorder import AudioRecorder
 from ..input.hotkey import HotkeyListener
-from ..input.keyboard import SimpleKeyboardSimulator
+from ..input.keyboard import KeyboardSimulator
 from ..recognition.whisper_engine import WhisperEngine
 from .state_machine import StateMachine, VoiceInputState
 
@@ -42,8 +42,8 @@ class VoiceInputController:
         self._setup_state_handlers()
         
         # Components
-        self.recorder = SimpleAudioRecorder()
-        self.keyboard = SimpleKeyboardSimulator()
+        self.recorder = AudioRecorder()
+        self.keyboard = KeyboardSimulator()
         self.hotkey = HotkeyListener(self._on_hotkey)
         
         # Recognition engine
