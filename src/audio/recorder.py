@@ -41,6 +41,7 @@ class AudioRecorder:
         Returns:
             Path to the output file.
         """
+        print(f"[AUDIO] start_recording called, is_recording={self._is_recording}")
         if self._is_recording:
             raise RuntimeError("Already recording")
             
@@ -57,16 +58,25 @@ class AudioRecorder:
         
         def callback(indata, frames, time_info, status):
             if status:
-                print(f"Audio status: {status}")
+                print(f"[AUDIO] status: {status}")
             self._audio_buffer.append(indata.copy())
             
-        self._stream = self._sd.InputStream(
-            samplerate=self.SAMPLE_RATE,
-            channels=self.CHANNELS,
-            dtype=self.DTYPE,
-            callback=callback,
-        )
-        self._stream.start()
+        print(f"[AUDIO] Creating InputStream with sr={self.SAMPLE_RATE}, ch={self.CHANNELS}")
+        try:
+            self._stream = self._sd.InputStream(
+                samplerate=self.SAMPLE_RATE,
+                channels=self.CHANNELS,
+                dtype=self.DTYPE,
+                callback=callback,
+            )
+            print("[AUDIO] Starting stream...")
+            self._stream.start()
+            print("[AUDIO] Stream started successfully!")
+        except Exception as e:
+            print(f"[AUDIO] ERROR creating stream: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
         
         return self.output_file
         

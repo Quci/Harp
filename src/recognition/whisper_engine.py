@@ -1,52 +1,54 @@
 """
-Whisper speech recognition engine.
+Whisper speech recognition engine using faster-whisper.
 """
 
 import time
 from pathlib import Path
 from typing import Optional
 
-# Try to import whisper-cpp-python, fallback to mock if not available
+# Try to import faster-whisper, fallback to mock if not available
 try:
-    from whisper_cpp_python import Whisper
+    from faster_whisper import WhisperModel
     WHISPER_AVAILABLE = True
 except ImportError:
     WHISPER_AVAILABLE = False
-    Whisper = None
+    WhisperModel = None
 
 
 class WhisperEngine:
     """
-    Whisper-based speech recognition engine.
+    Whisper-based speech recognition engine using faster-whisper.
     """
     
     # Default model to use
-    DEFAULT_MODEL = "ggml-medium.bin"
+    DEFAULT_MODEL = "medium"
     
     def __init__(self, model_path: Optional[Path] = None):
         """
         Initialize Whisper engine.
         
         Args:
-            model_path: Path to the Whisper model file (ggml format).
-                       If None, looks in models/ directory.
+            model_path: Path to the Whisper model file (legacy, not used with faster-whisper).
+                       Model will be downloaded automatically by faster-whisper.
         """
-        self.model_path = model_path or self._find_default_model()
-        self._whisper = None
+        self.model_path = model_path
+        self._model = None
+        self._model_size = self._determine_model_size()
         
-    def _find_default_model(self) -> Path:
-        """Find the default model file."""
-        # Look in models/ directory
+    def _determine_model_size(self) -> str:
+        """Determine model size from path or use default."""
+        if self.model_path and self.model_path.exists():
+            # Try to extract size from filename (e.g., ggml-tiny.bin -> tiny)
+            name = self.model_path.name.lower()
+            for size in ["tiny", "base", "small", "medium", "large"]:
+                if size in name:
+                    return size
+        # Check if tiny model exists in models folder
         project_root = Path(__file__).parent.parent.parent
         model_dir = project_root / "models"
-        
-        # Try to find any .bin file
-        if model_dir.exists():
-            for bin_file in model_dir.glob("*.bin"):
-                return bin_file
-                
-        # Return expected path
-        return model_dir / self.DEFAULT_MODEL
+        if (model_dir / "ggml-tiny.bin").exists():
+            return "tiny"
+        return self.DEFAULT_MODEL
         
     def load_model(self) -> bool:
         """
@@ -56,28 +58,34 @@ class WhisperEngine:
             True if loaded successfully, False otherwise.
         """
         if not WHISPER_AVAILABLE:
-            print("Warning: whisper-cpp-python not installed. Using mock mode.")
-            print("Install with: pip install whisper-cpp-python")
+            print("Warning: faster-whisper not installed. Using mock mode.")
+            print("Install with: pip install faster-whisper")
             return False
             
-        if self._whisper is not None:
+        if self._model is not None:
             return True
             
-        if not self.model_path.exists():
-            print(f"Model not found: {self.model_path}")
-            print(f"Please download a Whisper model and place it in: {self.model_path.parent}")
-            print("Download from: https://huggingface.co/ggerganov/whisper.cpp")
-            return False
-            
         try:
-            print(f"Loading model: {self.model_path}")
+            print(f"Loading model: {self._model_size}")
+            print("(First time will download model, please wait...)")
             start_time = time.time()
-            self._whisper = Whisper(str(self.model_path))
+            
+            # Load model - auto downloads if not present
+            # Use CPU by default for compatibility
+            self._model = WhisperModel(
+                self._model_size,
+                device="cpu",
+                compute_type="int8",
+            )
+            
             elapsed = time.time() - start_time
             print(f"Model loaded in {elapsed:.2f}s")
             return True
+            
         except Exception as e:
             print(f"Failed to load model: {e}")
+            import traceback
+            traceback.print_exc()
             return False
             
     def transcribe(
@@ -97,7 +105,7 @@ class WhisperEngine:
         Returns:
             Transcribed text.
         """
-        if self._whisper is None:
+        if self._model is None:
             if not self.load_model():
                 return ""
                 
@@ -105,31 +113,45 @@ class WhisperEngine:
             print(f"Transcribing: {audio_path}")
             start_time = time.time()
             
-            # Transcribe
-            result = self._whisper.transcribe(
+            # Transcribe with auto language detection
+            segments, info = self._model.transcribe(
                 str(audio_path),
                 language=language,
                 task=task,
+                beam_size=5,
             )
+            
+            # Collect all segments
+            texts = []
+            for segment in segments:
+                texts.append(segment.text)
+                
+            result = " ".join(texts).strip()
+            
+            # Convert Traditional Chinese to Simplified Chinese
+            if info.language == "zh":
+                try:
+                    import opencc
+                    converter = opencc.OpenCC('t2s')  # Traditional to Simplified
+                    result = converter.convert(result)
+                except ImportError:
+                    pass  # opencc not installed, keep original
             
             elapsed = time.time() - start_time
             print(f"Transcription completed in {elapsed:.2f}s")
+            print(f"Detected language: {info.language} (probability: {info.language_probability:.2f})")
             
-            # Extract text from result
-            if isinstance(result, dict) and "text" in result:
-                return result["text"].strip()
-            elif isinstance(result, str):
-                return result.strip()
-            else:
-                return str(result)
+            return result
                 
         except Exception as e:
             print(f"Transcription failed: {e}")
+            import traceback
+            traceback.print_exc()
             return ""
             
     @property
     def is_loaded(self) -> bool:
-        return self._whisper is not None
+        return self._model is not None
 
 
 class MockWhisperEngine:

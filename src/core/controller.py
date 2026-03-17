@@ -53,6 +53,7 @@ class VoiceInputController:
             print("[INFO] Using mock mode (no real recognition)")
         else:
             self.engine = WhisperEngine(model_path)
+            print(f"[INFO] Using WhisperEngine: {type(self.engine).__name__}")
             
         self._temp_audio_file: Optional[Path] = None
         
@@ -65,33 +66,40 @@ class VoiceInputController:
         print(f"[STATE] {old_state.value} -> {new_state.value}")
         
     def _on_hotkey(self):
-        """Handle F5 hotkey press."""
+        """Handle F6 hotkey press."""
         current_state = self.state_machine.state
+        print(f"[CONTROLLER] Hotkey pressed, current state: {current_state.value}")
         
         if current_state == VoiceInputState.IDLE:
-            # Start recording
+            print("[CONTROLLER] Starting recording...")
             self._start_recording()
         elif current_state == VoiceInputState.RECORDING:
-            # Stop recording and process
+            print("[CONTROLLER] Stopping recording...")
             self._stop_and_process()
-        # Ignore if in processing or typing state
+        else:
+            print(f"[CONTROLLER] Ignoring hotkey in state: {current_state.value}")
         
     def _start_recording(self):
         """Start audio recording."""
         try:
+            print("[RECORDER] Creating temp file...")
             # Create temp file for audio
             fd, temp_path = tempfile.mkstemp(suffix=".wav")
             import os
             os.close(fd)
             self._temp_audio_file = Path(temp_path)
+            print(f"[RECORDER] Temp file: {self._temp_audio_file}")
             
             # Start recording
+            print("[RECORDER] Calling start_recording()...")
             self.recorder.start_recording(self._temp_audio_file)
             self.state_machine.transition_to(VoiceInputState.RECORDING)
-            print("🎤 Recording started... (press F5 to stop)")
+            print("🎤 Recording started... (press F6 to stop)")
             
         except Exception as e:
             print(f"[ERROR] Failed to start recording: {e}")
+            import traceback
+            traceback.print_exc()
             self._cleanup()
             
     def _stop_and_process(self):
@@ -176,9 +184,10 @@ class VoiceInputController:
         
         print("\n✅ Voice Input Bridge started successfully!")
         print("\nUsage:")
-        print("  - Press F5 to start/stop recording")
+        print("  - Press F6 to start/stop recording")
         print("  - Press Ctrl+C to exit")
-        print("\nWaiting for F5 key...")
+        print("\n🎧 Listening for F6 key...")
+        print("👉 请现在按 F6 键测试\n")
         
     def stop(self):
         """Stop the voice input controller."""
@@ -236,7 +245,7 @@ def test_components():
         hotkey = HotkeyListener(lambda: print("  🔥 F5 pressed!"))
         hotkey.start()
         print("  ✅ HotkeyListener started")
-        print("  ⚠️  Press F5 three times to continue...")
+        print("  ⚠️  Press F6 three times to continue...")
         
         count = [0]
         def increment():

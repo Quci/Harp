@@ -5,7 +5,7 @@ macOS Voice Bridge - Voice input using Whisper.
 Usage:
     python main.py [--model PATH] [--mock] [--test]
 
-Press F5 to start/stop recording.
+Press F6 to start/stop recording.
 The recognized text will be typed at the current cursor position.
 """
 

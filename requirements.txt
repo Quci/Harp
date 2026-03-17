@@ -1,5 +1,5 @@
 # Core dependencies for macOS Voice Bridge
-whisper-cpp-python>=0.2.0
+faster-whisper>=1.0.0
 pyobjc-framework-CoreGraphics>=9.0
 pyobjc-framework-Cocoa>=9.0
 sounddevice>=0.4.6

@@ -1,6 +1,6 @@
 """
 Global hotkey listener using pynput.
-Listens for F5 key globally.
+Listens for F6 key globally.
 """
 
 import threading
@@ -38,11 +38,14 @@ class HotkeyListener:
         def on_press(key):
             """Handle key press."""
             try:
-                # Check if F5 was pressed
-                if key == Key.f5:
+                print(f"[HOTKEY] Key pressed: {key}")
+                # Check if F6 was pressed (handle different key representations)
+                is_f6 = (key == Key.f6) or (hasattr(key, 'vk') and key.vk == 178)
+                if is_f6:
+                    print("[HOTKEY] F6 detected! Triggering callback...")
                     self.on_hotkey()
             except Exception as e:
-                print(f"Error in hotkey handler: {e}")
+                print(f"[HOTKEY] Error in hotkey handler: {e}")
                 
         def on_release(key):
             """Handle key release."""
@@ -85,7 +88,7 @@ class SimpleHotkeyListener:
             import keyboard as kb
             
             self._is_running = True
-            kb.on_press_key("f5", lambda e: self.on_hotkey())
+            kb.on_press_key("f6", lambda e: self.on_hotkey())
         except ImportError:
             print("Warning: keyboard library not available")
             
